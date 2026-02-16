@@ -1,7 +1,3 @@
-# shinyAPP_HemaProtRisk
-Hematologic Malignancy Proteomic Risk Stratification
-
-## Overview
 HemaProtRisk is a computational R Shiny platform integrating proteomics, genomics, and customized risk scoring. Through this app, you can:
 - View the effects of 2920 proteins on hematologic malignancies and their subtypes (proteomics & genomics levels)
 - Upload your own proteomics data to compute risk scores for Tier 1, 2, and 3 proteins

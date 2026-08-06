@@ -1,4 +1,3 @@
-#rsconnect::deployApp(appDir = "~/wcz111/bloodcancer/shinyAPP.HemaProtRisk",appFiles=c("app.R", "data/","www/"))
 library(shiny)
 library(data.table)
 library(dplyr)
@@ -6,6 +5,7 @@ library(DT)
 library(ggplot2)
 library(forestplot)
 library(grid)
+library(tidyr)
 ui <- fluidPage(
 
   ## ================= CSS =================
@@ -368,8 +368,8 @@ forest_plot_fun <- reactive({
         hrzl_lines[[as.character(i)]] <- gpar(lty = 2, col = "#00000040")
       }
     }
-    valid_lower <- forest_data[-1, "HR"]
-    valid_upper <- forest_data[-1, "HR"]
+    valid_lower <- forest_data[-1, "lower"]
+    valid_upper <- forest_data[-1, "upper"]
     min_tick <- floor(min(valid_lower, na.rm = TRUE) * 2) / 2
     max_tick <- ceiling(max(valid_upper, na.rm = TRUE) * 2) / 2
     xticks <- seq(from = min_tick, to = max_tick, by = 0.5)
@@ -424,17 +424,35 @@ forest_plot_fun <- reactive({
     return(fp)
   })
   
-  output$forest_plot <- renderPlot({
-    forest_plot_fun()
-  })
+output$forest_plot <- renderPlot({
+  print(forest_plot_fun())
+})
   
   output$download_forest <- downloadHandler(
     filename = function() {
-      paste0("Forest_", input$selected_Protein, ".pdf")
+      paste0(
+  "Forest_",
+  paste(input$selected_Protein, collapse = "_"),
+  ".pdf"
+)
     },
-    content = function(file) {
-      ggsave(file, forest_plot_fun(), width = 8, height = 6)
-    }
+content = function(file) {
+  grDevices::pdf(
+    file,
+    width = 9,
+    height = max(
+      6,
+      2 + 0.45 * nrow(selected_result())
+    )
+  )
+
+  on.exit(
+    grDevices::dev.off(),
+    add = TRUE
+  )
+
+  print(forest_plot_fun())
+}
   )
 
 # =========================
@@ -484,7 +502,7 @@ geno_selected_result <- eventReactive(input$geno_update, {
       dplyr::filter(pQTL_source %in% input$geno_selected_pQTL_source)
   }
 
-  df %>% dplyr::arrange(P)
+  df %>% dplyr::arrange(FDR)
 })
 
 # =========================
@@ -500,7 +518,7 @@ output$geno_result_table <- DT::renderDT({
 	  GWAS_soucre=GWAS_soucre,
         `pQTL_source` = `pQTL_source`,
         `OR_95CI` = `OR_95CI`,
-        `P value` = P
+        FDR = FDR
       ),
     rownames = FALSE,
     options = list(pageLength = 10, autoWidth = TRUE)
@@ -524,14 +542,14 @@ geno_forestplot_obj <- reactive({
     lower = df$lower,
     upper = df$upper,
     `OR_95CI` = df$`OR_95CI`,
-    P   = df$P,
+    FDR   = df$FDR,
     stringsAsFactors = FALSE
   )
       a_df <- as.data.frame(matrix(colnames(forest_data),   nrow = 1))
     colnames(a_df) <- colnames(forest_data)
     forest_data <- rbind(a_df, forest_data)
-    forest_data[1, 3:5] <- ""
-    forest_data[, 5:6] <- lapply(forest_data[, 5:6], as.numeric)
+    forest_data[1, 5:7] <- ""
+    forest_data[, 5:7] <- lapply(forest_data[, 5:7],  as.numeric)
 
     n_rows <- nrow(forest_data)
     hrzl_lines <- list(
@@ -544,8 +562,8 @@ geno_forestplot_obj <- reactive({
         hrzl_lines[[as.character(i)]] <- gpar(lty = 2, col = "#00000040")
       }
     }
-    valid_lower <- forest_data[-1, "OR"]
-    valid_upper <- forest_data[-1, "OR"]
+    valid_lower <- forest_data[-1, "lower"]
+    valid_upper <- forest_data[-1, "upper"]
     min_tick <- floor(min(valid_lower, na.rm = TRUE) * 2) / 2
     max_tick <- ceiling(max(valid_upper, na.rm = TRUE) * 2) / 2
     xticks <- seq(from = min_tick, to = max_tick, by = 0.5)
@@ -557,9 +575,9 @@ geno_forestplot_obj <- reactive({
       upper = forest_data[, 7],
       zero = 1,
       boxsize = 0.1,
-      graph.pos   = 3,
+      graph.pos   = 5,
       graphwidth = unit(.1, "npc"),
-      xlab = "Odd ratio and 95% CI",
+      xlab = "Odds ratio and 95% CI",
       title = paste("Forest Plot"),
       xticks = xticks,
       clip = c(min_tick - 0.3, max_tick + 0.3),
@@ -604,7 +622,7 @@ geno_forestplot_obj <- reactive({
 # Render forest plot
 # =========================
 output$geno_forest_plot <- renderPlot({
-  geno_forestplot_obj()
+  print(geno_forestplot_obj())
 })
 
 # =========================
@@ -620,11 +638,23 @@ output$geno_download_forest <- downloadHandler(
     )
   },
 
-  content = function(file) {
-    pdf(file, width = 9, height = 6)
-    geno_forestplot_obj()
-    dev.off()
-  }
+content = function(file) {
+  grDevices::pdf(
+    file,
+    width = 14,
+    height = max(
+      6,
+      2 + 0.45 * nrow(geno_selected_result())
+    )
+  )
+
+  on.exit(
+    grDevices::dev.off(),
+    add = TRUE
+  )
+
+  print(geno_forestplot_obj())
+}
 )
 
 
